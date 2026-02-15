@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Scan Training Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: Arial, sans-serif;
+    color: white;
+    touch-action: manipulation;
+    background: #111;
+}
+#main {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 70vh;
+    font-size: 180px;
+    text-align: center;
+    user-select: none;
+}
+#score, #timer {
+    position: fixed;
+    top: 10px;
+    font-size: 36px;
+    padding: 0 10px;
+}
+#score { left: 10px; }
+#timer { right: 10px; }
+#controls {
+    position: fixed;
+    bottom: 10px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+}
+button {
+    font-size: 22px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(0,0,0,0.5);
+    color: white;
+}
+button:active {
+    background: rgba(0,0,0,0.8);
+}
+#startScreen {
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background:#111;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    flex-direction:column;
+    z-index: 10;
+}
+#startScreen button {
+    font-size: 32px;
+    padding: 20px 40px;
+    margin-top:20px;
+}
+</style>
+</head>
+<body>
+
+<div id="startScreen">
+    <h1>Scan Training Game</h1>
+    <button onclick="showControls()">Start Game</button>
+</div>
+
+<div id="score">Score: 0</div>
+<div id="timer">60</div>
+<div id="main"></div>
+
+<div id="controls" style="display:none;">
+    <button onclick="startAutoMode()">Auto Mode</button>
+    <button onclick="startTapMode()">Tap Mode</button>
+    <button onclick="startVoiceMode()">Voice Mode</button>
+</div>
+
+<script>
+
+let score = 0;
+let correctAnswer = 0;
+let autoInterval = null;
+let tapMode = false;
+let recognition = null;
+let timerInterval = null;
+let timeLeft = 60;
+let gameRunning = false;
+
+// Show game mode buttons after Start Game
+function showControls() {
+    document.getElementById("startScreen").style.display = "none";
+    document.getElementById("controls").style.display = "flex";
+    resetGame();
+}
+
+// Reset everything for a new game
+function resetGame() {
+    stopAllModes(); 
+    gameRunning = false;
+    score = 0;
+    timeLeft = 60;
+    document.getElementById("score").innerText = "Score: " + score;
+    document.getElementById("timer").innerText = timeLeft;
+    document.getElementById("main").innerText = "";
+}
+
+// Generate random background color
+function randomColor() {
+    const colors = ["#e74c3c","#3498db","#2ecc71","#9b59b6","#f39c12","#1abc9c"];
+    return colors[Math.floor(Math.random()*colors.length)];
+}
+
+// Generate number or 3+9 math
+function generateTask() {
+    document.body.style.background = randomColor();
+    if (Math.random() < 0.5) {
+        correctAnswer = Math.floor(Math.random()*20)+1;
+        document.getElementById("main").innerText = correctAnswer;
+    } else {
+        let a = Math.floor(Math.random()*10)+1;
+        let b = Math.floor(Math.random()*10)+1;
+        correctAnswer = a + b;
+        document.getElementById("main").innerText = a + " + " + b;
+    }
+}
+
+// Update score
+function updateScore() {
+    score++;
+    document.getElementById("score").innerText = "Score: " + score;
+}
+
+// Start 60-second timer (only once)
+function startTimer() {
+    if(gameRunning) return;
+    gameRunning = true;
+    document.getElementById("timer").innerText = timeLeft;
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById("timer").innerText = timeLeft;
+        if(timeLeft <= 0) {
+            endGame();
+        }
+    }, 1000);
+}
+
+// End game and show final score + reset button
+function endGame() {
+    gameRunning = false;
+    stopAllModes();
+    document.getElementById("main").innerHTML = "Final Score: " + score + "<br><button onclick='resetGame()'>New Game</button>";
+}
+
+// Stop all mode intervals and voice recognition
+function stopAllModes() {
+    tapMode = false;
+    if(autoInterval) { clearInterval(autoInterval); autoInterval = null; }
+    if(recognition) { recognition.stop(); recognition = null; }
+}
+
+// Game Modes
+function startAutoMode() {
+    startTimer();
+    stopAllModes();
+    generateTask();
+    autoInterval = setInterval(generateTask, 2000);
+}
+
+function startTapMode() {
+    startTimer();
+    stopAllModes();
+    tapMode = true;
+    generateTask();
+}
+
+function startVoiceMode() {
+    startTimer();
+    stopAllModes();
+    generateTask(); // <-- show first number immediately
+    tapMode = false;
+
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = function(event) {
+        for(let i = event.resultIndex; i < event.results.length; i++) {
+            let spoken = event.results[i][0].transcript.trim();
+            if(!event.results[i].isFinal) continue;
+            let numSpoken = parseInt(spoken.match(/\d+/));
+            if(!isNaN(numSpoken) && numSpoken === correctAnswer) {
+                updateScore();
+                generateTask();
+            }
+        }
+    };
+    recognition.start();
+}
+
+// Tap to advance in Tap Mode
+document.body.addEventListener("click", function() {
+    if(tapMode && gameRunning) {
+        updateScore();
+        generateTask();
+    }
+});
+
+</script>
+
+</body>
+</html>
