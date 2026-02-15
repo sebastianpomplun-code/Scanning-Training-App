@@ -86,7 +86,6 @@ button:active {
 </div>
 
 <script>
-
 let score = 0;
 let correctAnswer = 0;
 let autoInterval = null;
@@ -183,28 +182,46 @@ function startTapMode() {
     generateTask();
 }
 
+// Android-safe continuous Voice Mode
 function startVoiceMode() {
-    startTimer();
     stopAllModes();
-    generateTask(); // <-- show first number immediately
     tapMode = false;
 
-    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    // Show first task and start timer
+    generateTask();
+    startTimer();
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert("Speech recognition not supported in this browser.");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.continuous = true;       // try to keep it listening
+    recognition.interimResults = false;
     recognition.lang = 'en-US';
 
     recognition.onresult = function(event) {
-        for(let i = event.resultIndex; i < event.results.length; i++) {
-            let spoken = event.results[i][0].transcript.trim();
-            if(!event.results[i].isFinal) continue;
-            let numSpoken = parseInt(spoken.match(/\d+/));
-            if(!isNaN(numSpoken) && numSpoken === correctAnswer) {
-                updateScore();
-                generateTask();
-            }
+        let spoken = event.results[event.results.length - 1][0].transcript.trim();
+        let numSpoken = parseInt(spoken.match(/\d+/));
+        if (!isNaN(numSpoken) && numSpoken === correctAnswer) {
+            updateScore();
+            generateTask();
         }
     };
+
+    recognition.onerror = function(event) {
+        console.log("Speech error:", event.error);
+    };
+
+    // This is the key: auto-restart when recognition stops
+    recognition.onend = function() {
+        if (gameRunning) {
+            recognition.start();
+        }
+    };
+
     recognition.start();
 }
 
@@ -215,7 +232,6 @@ document.body.addEventListener("click", function() {
         generateTask();
     }
 });
-
 </script>
 
 </body>
